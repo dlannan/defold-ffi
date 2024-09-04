@@ -1,5 +1,5 @@
 
-require("examples.winuser")
+require("examples.messagebox")
 
 function init(self)
 	msg.post(".", "acquire_input_focus")
