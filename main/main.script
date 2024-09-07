@@ -1,8 +1,36 @@
-local window = require("examples.createwindow")
+local win = require("examples.createwindow")
+local sql = require("examples.sqlite3")
+
+go.property("count", 100)
+go.property("spread", 500)
 
 function init(self)
 	msg.post(".", "acquire_input_focus")
 	msg.post("@render:", "use_fixed_fit_projection", { near = -1, far = 1 })
+
+	self.w, self.h = window.get_size()
+	self.objs = {}
+	self.urls = {}
+	sql:init()
+end
+
+function update(self, dt)
+
+	-- Move the objects around
+	local hspread = self.spread/2
+	for k,v in ipairs(self.objs) do
+		if(v.y >= hspread) then v.dir = v.dir + math.pi
+		elseif(v.y <= -hspread) then v.dir = v.dir + math.pi
+		elseif(v.x >= hspread) then v.dir = v.dir + math.pi
+		elseif(v.x < -hspread) then v.dir = v.dir + math.pi end
+		v.dir = math.fmod(v.dir, math.pi * 2.0)
+				
+		local xt = math.sin(v.dir)
+		local yt = math.cos(v.dir)
+		v.x = v.x + xt * dt * 50  -- make speed frame rate related
+		v.y = v.y + yt * dt * 50
+		go.set_position(vmath.vector3(v.x +self.w/2, v.y + self.h/2, 0.0), self.urls[v.id])
+	end
 end
 
 function on_input(self, action_id, action)
@@ -10,6 +38,30 @@ function on_input(self, action_id, action)
 		require("examples.messagebox")
 	end
 	if action_id == hash("key_2") and action.pressed then
-		window.makeWindow()
+		win.makeWindow()
 	end
+	if action_id == hash("key_3") and action.pressed then
+		sql:filldb(self.count, self.spread)
+		self.objs = sql:dumptable("GameObjects")
+		
+		for k,v in ipairs(self.objs) do
+			self.urls[k] = factory.create("/builder#factory", vmath.vector3(v.x +self.w/2, v.y + self.h/2, 0.0), nil, {my_value = 1})
+		end
+	end	
+
+	-- Save the objects into the sqldb and write to disk
+	if action_id == hash("key_s") and action.pressed then 
+		sql:updatedb("GameObjects", self.objs)
+		sql:save("testdb.sqlite3")
+	end
+	-- Load objects from disk and populate db
+	if action_id == hash("key_l") and action.pressed then 
+		sql:load("testdb.sqlite3")
+		self.objs = sql:dumptable("GameObjects")
+	end
+	
+end
+
+function final(self)
+	sql:final()
 end
